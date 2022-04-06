@@ -2,7 +2,7 @@ import socket
 import threading
 import time
 
-# The host IP (standard IPV4 address here)
+# The host IP (default IPV4 address here)
 HOST = '127.0.0.1'
 
 # The port number
@@ -22,6 +22,7 @@ server.listen()
 # Lists to store clients and their respective usernames
 clients = []
 usernames = []
+# Dictionary to store text colors for each user
 colors = {}
 
 
@@ -107,10 +108,7 @@ def login(client):
             break
 
         # If username is already taken, request user to input a valid username
-        print(usernames)
-        print(username)
         if username in usernames:
-            print(f'{username} IN {usernames}')
             client.send('INVALID_USERNAME'.encode('utf-8'))
             continue
         # Username valid, continue on
@@ -137,7 +135,7 @@ def login(client):
             thread = threading.Thread(target=handle_client, args=(client,))
             thread.start()
 
-            print(f'Username is: {username}')
+            print(f'Client username: {username}')
             break
 
 

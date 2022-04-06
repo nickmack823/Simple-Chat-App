@@ -4,8 +4,11 @@ import tkinter
 import tkinter.scrolledtext
 from tkinter import simpledialog
 
+# Server IP
 HOST = '127.0.0.1'
+# Server port
 PORT = 9090
+# Text color options
 COLORS = ['Black', 'Blue', 'Yellow', 'Purple', 'Orange', 'Brown', 'Cyan']
 
 
@@ -20,7 +23,7 @@ class User:
         # Username
         self.username = None
         # Check to determine if username is valid (not taken by another)
-        self.username_valid = False
+        # self.username_valid = False
 
         # Establish chat window
         self.chat_window = tkinter.Tk()
@@ -38,7 +41,7 @@ class User:
         self.input_area = tkinter.Text(self.frame, height=2)
         self.chat_log = tkinter.scrolledtext.ScrolledText(self.frame)
         # Disable text box so user cannot alter chat output display
-        self.chat_log.config(state='disabled')
+        self.chat_log.config(state='disabled', bg='lightgray')
         # Tags for special colored messages
         self.chat_log.tag_config('new_user', foreground='green')
         self.chat_log.tag_config('user_disconnect', foreground='red')
@@ -58,7 +61,7 @@ class User:
         self.receiving = True
 
         # Open client to receiving messages
-        self.receive_messages()
+        self.handle_incoming_messages()
 
     def ask_for_username(self, message=None):
         """
@@ -70,12 +73,12 @@ class User:
             message = 'Please enter a username.'
         self.username = simpledialog.askstring('Username', f'Welcome to Chat App!\n{message}',
                                                parent=self.chat_window)
+        # User presses 'OK' without entering anything, ask again
+        if self.username == '':
+            self.ask_for_username()
         # Retry with new username
         if message == 'Invalid username, try again.':
-            self.send_username()
-
-    def send_username(self):
-        self.socket.send(self.username.encode('utf-8'))
+            self.socket.send(self.username.encode('utf-8'))
 
     def access_chat(self):
         """
@@ -83,7 +86,7 @@ class User:
         :return:
         """
         # Thread to handle receiving broadcasts from the server
-        receive_thread = threading.Thread(target=self.receive_messages)
+        receive_thread = threading.Thread(target=self.handle_incoming_messages)
 
         # Begin thread to receive messages
         receive_thread.start()
@@ -121,7 +124,6 @@ class User:
 
         # Function for updating user text color
         def send_color(color):
-            print('SENDING COLOR')
             self.socket.send(f'{self.username}_COLOR={color.lower()}'.encode('utf-8'))
 
         # Create text color selector
@@ -141,9 +143,9 @@ class User:
         # Begin loop
         self.chat_window.mainloop()
 
-    def receive_messages(self):
+    def handle_incoming_messages(self):
         """
-        While the user is connected, looks for messages to receive from the server.
+        While the user is connected, looks for messages to handle from the server.
         :return:
         """
         # If user is connected, loop to check for messages to receive
@@ -155,7 +157,7 @@ class User:
                 print(f'CLIENT RECEIVING {message}')
                 # If server is asking for user's username:
                 if message == 'REQUEST_USERNAME':
-                    self.send_username()
+                    self.socket.send(self.username.encode('utf-8'))
                 # Username declared valid
                 elif message == 'VALID_USERNAME':
                     self.access_chat()
