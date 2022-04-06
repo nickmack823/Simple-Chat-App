@@ -44,7 +44,7 @@ class User:
         self.chat_log.tag_config('user_disconnect', foreground='red')
 
         # Create list of connected users
-        self.users_list = tkinter.scrolledtext.ScrolledText(self.frame, width=10, height=20)
+        self.users_list = tkinter.scrolledtext.ScrolledText(self.frame, width=15, height=20)
         self.users_list.config(state='disabled')
 
         # Client's color selection
@@ -70,6 +70,12 @@ class User:
             message = 'Please enter a username.'
         self.username = simpledialog.askstring('Username', f'Welcome to Chat App!\n{message}',
                                                parent=self.chat_window)
+        # Retry with new username
+        if message == 'Invalid username, try again.':
+            self.send_username()
+
+    def send_username(self):
+        self.socket.send(self.username.encode('utf-8'))
 
     def access_chat(self):
         """
@@ -146,15 +152,17 @@ class User:
             try:
                 # Message received from server
                 message = self.socket.recv(1024).decode('utf-8')
+                print(f'CLIENT RECEIVING {message}')
                 # If server is asking for user's username:
                 if message == 'REQUEST_USERNAME':
-                    self.socket.send(self.username.encode('utf-8'))
+                    self.send_username()
                 # Username declared valid
                 elif message == 'VALID_USERNAME':
                     self.access_chat()
                 # Username declared invalid
                 elif message == 'INVALID_USERNAME':
-                    self.ask_for_username('Username taken, try again.')
+                    self.ask_for_username('Invalid username, try again.')
+                # Message notifying user that they have connected to the chat successfully
                 elif message == f'Connected to chat as {self.username}\n':
                     self.chat_log.config(state='normal')
                     self.chat_log.insert('end', message)
@@ -168,16 +176,17 @@ class User:
                     for char in users:
                         if char == ' ':
                             # Add user to list
+                            if username == self.username:
+                                username += ' (You)'
                             self.users_list.insert('end', username + '\n\n')
                             username = ''
                         else:
                             username = username + char
                     self.users_list.config(state='disabled')
-                # Else, receiving a message from another user
+                # Else, receiving a message that needs to be colored (user joins, user leaves, user's sent message)
                 else:
                     # Set state to normal to allow for chat log to be updated
                     self.chat_log.config(state='normal')
-
                     # Insert message with appropriate color
                     if 'has joined the chat.\n' in message:
                         color = 'green'
@@ -235,5 +244,6 @@ class User:
         exit(0)
 
 
-# Create User instance to initialize connection to server socket
-user = User(HOST, PORT)
+if __name__ == '__main__':
+    # Create User instance to initialize connection to server socket
+    user = User(HOST, PORT)

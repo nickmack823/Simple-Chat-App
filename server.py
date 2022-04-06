@@ -25,8 +25,7 @@ usernames = []
 colors = {}
 
 
-# Run in separate thread
-def broadcast(message):
+def broadcast_message(message):
     """
     Broadcasts a message to all connected users.
     :param message: the message to broadcast
@@ -65,7 +64,7 @@ def handle_client(client):
                 # Get their color
                 color = colors[username]
                 # Send the message with their color
-                broadcast(f'{color}_{username}: {message}\n'.encode('utf-8'))
+                broadcast_message(f'{color}_{username}: {message}\n'.encode('utf-8'))
         # If unable to handle user (user disconnects, crashes, etc.), remove user from list and close their connection
         except ConnectionResetError:
             # Remove the client
@@ -79,6 +78,7 @@ def receive_connections():
     Receives and accepts connection requests from potential users.
     :return:
     """
+    print('Server started and running.')
     while True:
         # Accepts connection request from a client and gets their socket (user) and address (address_
         client, client_address = server.accept()
@@ -91,15 +91,14 @@ def receive_connections():
 
 def login(client):
     """
-    Handles user login attempts by looping until either a valid (unique) username is given or the user closes the
-    login window.
+    Handles user login attempts by looping in a separate thread until either a valid (unique) username is given or
+    the user closes the login window.
     :param client: client to handle login for
     :return:
     """
+    # Send the initial message to user to request the declaration of a username
+    client.send('REQUEST_USERNAME'.encode('utf-8'))
     while True:
-        # Send a message to user to request the declaration of a username
-        client.send('REQUEST_USERNAME'.encode('utf-8'))
-
         # The user's username input
         username = client.recv(1024).decode('utf-8')
 
@@ -108,7 +107,10 @@ def login(client):
             break
 
         # If username is already taken, request user to input a valid username
+        print(usernames)
+        print(username)
         if username in usernames:
+            print(f'{username} IN {usernames}')
             client.send('INVALID_USERNAME'.encode('utf-8'))
             continue
         # Username valid, continue on
@@ -126,7 +128,7 @@ def login(client):
             # Send out messages to the chat log notifying of user's joining
             client.send(f'Connected to chat as {username}\n'.encode('utf-8'))
             time.sleep(1)
-            broadcast(f'{username} has joined the chat.\n'.encode('utf-8'))
+            broadcast_message(f'{username} has joined the chat.\n'.encode('utf-8'))
 
             # Update user list
             update_user_list()
@@ -153,7 +155,7 @@ def update_user_list():
     time.sleep(1)
 
     # Sends users list to clients
-    broadcast(users.encode('utf-8'))
+    broadcast_message(users.encode('utf-8'))
 
 
 def remove_client(client):
@@ -172,9 +174,8 @@ def remove_client(client):
     update_user_list()
 
     # Notify users that someone has left
-    broadcast(f'{username} has left the chat.\n'.encode('utf-8'))
+    broadcast_message(f'{username} has left the chat.\n'.encode('utf-8'))
 
-
-print('Starting chat app server...')
-receive_connections()
-print('Server started and running.')
+if __name__ == '__main__':
+    print('Starting chat app server...')
+    receive_connections()
