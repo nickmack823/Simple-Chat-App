@@ -1,5 +1,6 @@
 import socket
 import threading
+import time
 import tkinter
 import tkinter.scrolledtext
 from tkinter import simpledialog
@@ -23,7 +24,11 @@ class User:
         # Username
         self.username = None
         # Check to determine if username is valid (not taken by another)
-        # self.username_valid = False
+
+        # Connected users
+        self.connected_users = []
+        # User to privately chat with
+        self.selected_user = None
 
         # Establish chat window
         self.chat_window = tkinter.Tk()
@@ -50,6 +55,10 @@ class User:
         self.users_list = tkinter.scrolledtext.ScrolledText(self.frame, width=15, height=20)
         self.users_list.config(state='disabled')
 
+        # Input label
+        self.input_label = tkinter.Label(self.frame, text='Message')
+        self.input_label.config(font=('Arial', 14))
+
         # Client's color selection
         self.color = tkinter.StringVar()
         self.color.set('Black')
@@ -62,6 +71,38 @@ class User:
 
         # Open client to receiving messages
         self.handle_incoming_messages()
+
+    def select_user(self, event):
+        print('Selecting user')
+        # get the index of the mouse click
+        index = self.users_list.index("@%s,%s" % (event.x, event.y))
+
+        # Check each username to see if user selected it
+        for username in self.connected_users:
+            tag_indices = list(self.users_list.tag_ranges(username))
+
+            # Iterate through
+            for start, end in zip(tag_indices[0::2], tag_indices[1::2]):
+                # Check if username found in mouse click
+                if self.users_list.compare(start, '<=', index) and self.users_list.compare(index, '<', end):
+                    # Gets user's selection
+                    selection = self.users_list.get(start, end)
+                    user = ''
+                    # Remove newline characters from selection
+                    for char in selection:
+                        if char == "\n":
+                            break
+                        user += char
+                    # Select user if user not selected, else deselect
+                    self.selected_user = user if self.selected_user != user else None
+                    # If user selecting, change background to indicate selection
+                    if self.selected_user is not None:
+                        self.users_list.tag_config(user, background='lightgray')
+                        self.input_label.config(text=f'Message (To {user})')
+                    # Deselecting, revert components
+                    else:
+                        self.users_list.tag_config(user, background='white')
+                        self.input_label.config(text='Message')
 
     def ask_for_username(self, message=None):
         """
@@ -107,12 +148,8 @@ class User:
         chat_label.config(font=('Arial', 14))
 
         # Users label
-        users_label = tkinter.Label(self.frame, text='Online Users')
+        users_label = tkinter.Label(self.frame, text='Online Users\n(Click a user to message privately)')
         users_label.config(font=('Arial', 12))
-
-        # Input label
-        input_label = tkinter.Label(self.frame, text='Message')
-        input_label.config(font=('Arial', 14))
 
         # 'Send' button
         send_button = tkinter.Button(self.frame, text='Send', command=self.send_message)
@@ -134,7 +171,7 @@ class User:
         users_label.grid(row=0, column=1, padx=(0, 20))
         self.chat_log.grid(row=1, column=0, padx=20, pady=5)
         self.users_list.grid(row=1, column=1, padx=20)
-        input_label.grid(row=2, column=0)
+        self.input_label.grid(row=2, column=0)
         self.input_area.grid(row=3, column=0, padx=10, pady=10)
         send_button.grid(row=3, column=1)
         color_label.grid(row=4, column=1, pady=(0, 10))
@@ -175,12 +212,19 @@ class User:
                     self.users_list.config(state='normal')
                     # Empty current list
                     self.users_list.delete('0.0', 'end')
+                    # Empty current list of connected users
+                    self.connected_users = []
                     for char in users:
                         if char == ' ':
+                            self.connected_users.append(username)
                             # Add user to list
                             if username == self.username:
                                 username += ' (You)'
-                            self.users_list.insert('end', username + '\n\n')
+                            # Create unique tag to allow for selection and private messaging with user
+                            self.users_list.tag_config(username)
+                            self.users_list.tag_bind(username, '<Button-1>', self.select_user)
+                            print(username)
+                            self.users_list.insert('end', username + '\n\n', username)
                             username = ''
                         else:
                             username = username + char
@@ -228,6 +272,9 @@ class User:
         message = self.input_area.get('0.0', 'end-1c')
         # If input not empty, send the message and delete the text from the entry box
         if len(message) > 0:
+            if self.selected_user is not None:
+                print(f"DIRECT MESSAGING WITH {self.selected_user}")
+                message = f'CHAT_WITH_{self.selected_user} ' + message
             self.socket.send(message.encode('utf-8'))
             self.input_area.delete('0.0', 'end')
 
